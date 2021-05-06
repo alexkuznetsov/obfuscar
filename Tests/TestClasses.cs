@@ -1,4 +1,5 @@
 #region Copyright (c) 2007 Ryan Williams <drcforbin@gmail.com>
+
 /// <copyright>
 /// Copyright (c) 2007 Ryan Williams <drcforbin@gmail.com>
 /// 
@@ -20,45 +21,87 @@
 /// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 /// THE SOFTWARE.
 /// </copyright>
-#endregion
 
-using System;
-using System.Collections.Generic;
-using System.Text;
+#endregion
 
 namespace ObfuscarTests
 {
-	[Obfuscar.Obfuscate]
-	public interface TestClass_Interface1
-	{
-		int MethodA( int param1 );
-		int MethodB( int param1 );
-		int Method1( int param1 );
-		int Method2( int param1 );
-	}
+#pragma warning disable 618
+    [Obfuscar.Obfuscate]
+#pragma warning restore 618
+    public interface TestClass_Interface1
+    {
+        int MethodA(int param1);
+        int MethodB(int param1);
+        int Method1(int param1);
+        int Method2(int param1);
+    }
 
-	[Obfuscar.Obfuscate]
-	public class TestClass_InterfaceOverride1 : TestClass_Interface1
-	{
-		public int MethodA( int param1 ) { return param1; }
-		public int MethodB( int param1 ) { return param1; }
-		public int Method1( int param1 ) { return param1; }
-		public int Method2( int param1 ) { return param1; }
-	}
+#pragma warning disable 618
+    [Obfuscar.Obfuscate]
+#pragma warning restore 618
+    public class TestClass_InterfaceOverride1 : TestClass_Interface1
+    {
+        public int MethodA(int param1)
+        {
+            return param1;
+        }
 
-	[Obfuscar.Obfuscate]
-	public class TestClass_Base1
-	{
-		public int MethodA( int param1 ) { return param1; }
-		public int MethodB( int param1 ) { return param1; }
-		public virtual int Method1( int param1 ) { return param1; }
-		public int Method2( int param1 ) { return param1; }
-	}
+        public int MethodB(int param1)
+        {
+            return param1;
+        }
 
-	[Obfuscar.Obfuscate]
-	public class TestClass_InterfaceOverride2 : TestClass_Base1, TestClass_Interface1
-	{
-		public virtual int MethodX( int param1 ) { return param1; }
-		public override int Method1( int param1 ) { return param1; }
-	}
+        public int Method1(int param1)
+        {
+            return param1;
+        }
+
+        public int Method2(int param1)
+        {
+            return param1;
+        }
+    }
+
+#pragma warning disable 618
+    [Obfuscar.Obfuscate]
+#pragma warning restore 618
+    public class TestClass_Base1
+    {
+        public int MethodA(int param1)
+        {
+            return param1;
+        }
+
+        public int MethodB(int param1)
+        {
+            return param1;
+        }
+
+        public virtual int Method1(int param1)
+        {
+            return param1;
+        }
+
+        public int Method2(int param1)
+        {
+            return param1;
+        }
+    }
+
+#pragma warning disable 618
+    [Obfuscar.Obfuscate]
+#pragma warning restore 618
+    public class TestClass_InterfaceOverride2 : TestClass_Base1, TestClass_Interface1
+    {
+        public virtual int MethodX(int param1)
+        {
+            return param1;
+        }
+
+        public override int Method1(int param1)
+        {
+            return param1;
+        }
+    }
 }

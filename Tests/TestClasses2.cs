@@ -1,4 +1,5 @@
 #region Copyright (c) 2007 Ryan Williams <drcforbin@gmail.com>
+
 /// <copyright>
 /// Copyright (c) 2007 Ryan Williams <drcforbin@gmail.com>
 /// 
@@ -20,32 +21,35 @@
 /// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 /// THE SOFTWARE.
 /// </copyright>
+
 #endregion
 
 using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace ObfuscarTests
 {
-	[Obfuscar.Obfuscate]
-	public class TestNonInternalOverloadBase : IDisposable
-	{
-		public void Dispose( )
-		{
-			Dispose( false );
-		}
+#pragma warning disable 618
+    [Obfuscar.Obfuscate]
+#pragma warning restore 618
+    public class TestNonInternalOverloadBase : IDisposable
+    {
+        public void Dispose()
+        {
+            Dispose(false);
+        }
 
-		protected virtual void Dispose( bool disp )
-		{
-		}
-	}
+        protected virtual void Dispose(bool disp)
+        {
+        }
+    }
 
-	[Obfuscar.Obfuscate]
-	public class TestNonInternalOverloadOverride : TestNonInternalOverloadBase
-	{
-		protected override void Dispose( bool disp )
-		{
-		}
-	}
+#pragma warning disable 618
+    [Obfuscar.Obfuscate]
+#pragma warning restore 618
+    public class TestNonInternalOverloadOverride : TestNonInternalOverloadBase
+    {
+        protected override void Dispose(bool disp)
+        {
+        }
+    }
 }

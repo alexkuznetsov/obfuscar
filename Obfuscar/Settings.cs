@@ -1,4 +1,5 @@
 #region Copyright (c) 2007 Ryan Williams <drcforbin@gmail.com>
+
 /// <copyright>
 /// Copyright (c) 2007 Ryan Williams <drcforbin@gmail.com>
 /// 
@@ -20,130 +21,74 @@
 /// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 /// THE SOFTWARE.
 /// </copyright>
+
 #endregion
+
 using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Xml;
 
 namespace Obfuscar
 {
-	class Settings
-	{
-		string inPath;
-		string outPath;
-		string logFilePath;
-		bool markedOnly;
-	    bool renameFields;
-		bool renameProperties;
-		bool renameEvents;
-		bool keepPublicApi;
-		bool hidePrivateApi;
-		bool reuseNames;
-		bool useUnicodeNames;
-		bool useKoreanNames;
-		bool xmlMapping;
-		bool hideStrings;
-		bool optimize;
-		bool suppressIldasm;
-		bool renegerateDebugInfo;
-		string keyFile;
+    class Settings
+    {
+        public Settings(Variables vars)
+        {
+            InPath = Environment.ExpandEnvironmentVariables(vars.GetValue("InPath", "."));
+            OutPath = Environment.ExpandEnvironmentVariables(vars.GetValue("OutPath", "."));
+            LogFilePath = Environment.ExpandEnvironmentVariables(vars.GetValue("LogFile", ""));
+            MarkedOnly = XmlConvert.ToBoolean(vars.GetValue("MarkedOnly", "false"));
 
-		public Settings (Variables vars)
-		{
-			inPath = Environment.ExpandEnvironmentVariables (vars.GetValue ("InPath", "."));
-			outPath = Environment.ExpandEnvironmentVariables (vars.GetValue ("OutPath", "."));
-			logFilePath = Environment.ExpandEnvironmentVariables (vars.GetValue ("LogFile", ""));
-			markedOnly = XmlConvert.ToBoolean (vars.GetValue ("MarkedOnly", "false"));
+            RenameFields = XmlConvert.ToBoolean(vars.GetValue("RenameFields", "true"));
+            RenameProperties = XmlConvert.ToBoolean(vars.GetValue("RenameProperties", "true"));
+            RenameEvents = XmlConvert.ToBoolean(vars.GetValue("RenameEvents", "true"));
+            KeepPublicApi = XmlConvert.ToBoolean(vars.GetValue("KeepPublicApi", "true"));
+            HidePrivateApi = XmlConvert.ToBoolean(vars.GetValue("HidePrivateApi", "true"));
+            ReuseNames = XmlConvert.ToBoolean(vars.GetValue("ReuseNames", "true"));
+            UseUnicodeNames = XmlConvert.ToBoolean(vars.GetValue("UseUnicodeNames", "false"));
+            UseKoreanNames = XmlConvert.ToBoolean(vars.GetValue("UseKoreanNames", "false"));
+            HideStrings = XmlConvert.ToBoolean(vars.GetValue("HideStrings", "true"));
+            Optimize = XmlConvert.ToBoolean(vars.GetValue("OptimizeMethods", "true"));
+            SuppressIldasm = XmlConvert.ToBoolean(vars.GetValue("SuppressIldasm", "true"));
 
-            renameFields = XmlConvert.ToBoolean (vars.GetValue("RenameFields", "true"));
-			renameProperties = XmlConvert.ToBoolean (vars.GetValue ("RenameProperties", "true"));
-			renameEvents = XmlConvert.ToBoolean (vars.GetValue ("RenameEvents", "true"));
-			keepPublicApi = XmlConvert.ToBoolean (vars.GetValue ("KeepPublicApi", "true"));
-			hidePrivateApi = XmlConvert.ToBoolean (vars.GetValue ("HidePrivateApi", "true"));
-			reuseNames = XmlConvert.ToBoolean (vars.GetValue ("ReuseNames", "true"));
-			useUnicodeNames = XmlConvert.ToBoolean (vars.GetValue ("UseUnicodeNames", "false"));
-			useKoreanNames = XmlConvert.ToBoolean (vars.GetValue ("UseKoreanNames", "false"));
-			hideStrings = XmlConvert.ToBoolean (vars.GetValue ("HideStrings", "true"));
-			optimize = XmlConvert.ToBoolean (vars.GetValue ("OptimizeMethods", "true"));
-			suppressIldasm = XmlConvert.ToBoolean (vars.GetValue ("SuppressIldasm", "true"));
+            XmlMapping = XmlConvert.ToBoolean(vars.GetValue("XmlMapping", "false"));
+            RegenerateDebugInfo = XmlConvert.ToBoolean(vars.GetValue("RegenerateDebugInfo", "false"));
+            AnalyzeXaml = XmlConvert.ToBoolean(vars.GetValue("AnalyzeXaml", "false"));
+        }
 
-			xmlMapping = XmlConvert.ToBoolean (vars.GetValue ("XmlMapping", "false"));
-			renegerateDebugInfo = XmlConvert.ToBoolean (vars.GetValue ("RegenerateDebugInfo", "false"));
-			keyFile = vars.GetValue ("KeyFile", null);
-			keyFile = keyFile == null ? null : Environment.ExpandEnvironmentVariables (keyFile);
-		}
+        public bool RegenerateDebugInfo { get; }
 
-		public bool RegenerateDebugInfo {
-			get { return renegerateDebugInfo; }
-		}
+        public string InPath { get; }
 
-		public string InPath {
-			get { return inPath; }
-		}
+        public string OutPath { get; }
 
-		public string OutPath {
-			get { return outPath; }
-		}
+        public bool MarkedOnly { get; }
 
-		public bool MarkedOnly {
-			get { return markedOnly; }
-		}
+        public string LogFilePath { get; }
 
-		public string LogFilePath {
-			get { return logFilePath; }
-		}
+        public bool RenameFields { get; }
 
-        public bool RenameFields {
-			get { return renameFields; }
-		}
+        public bool RenameProperties { get; }
 
-		public bool RenameProperties {
-			get { return renameProperties; }
-		}
+        public bool RenameEvents { get; }
 
-		public bool RenameEvents {
-			get { return renameEvents; }
-		}
+        public bool KeepPublicApi { get; }
 
-		public bool KeepPublicApi {
-			get { return keepPublicApi; }			
-		}
+        public bool HidePrivateApi { get; }
 
-		public bool HidePrivateApi {
-			get { return hidePrivateApi; }
-		}
+        public bool ReuseNames { get; }
 
-		public bool ReuseNames {
-			get { return reuseNames; }
-		}
+        public bool HideStrings { get; }
 
-		public bool HideStrings {
-			get { return hideStrings; }
-		}
+        public bool Optimize { get; }
 
-		public bool Optimize {
-			get { return optimize; }
-		}
+        public bool SuppressIldasm { get; }
 
-		public bool SuppressIldasm {
-			get { return suppressIldasm; }
-		}
+        public bool XmlMapping { get; }
 
-		public bool XmlMapping {
-			get { return xmlMapping; }
-		}
+        public bool UseUnicodeNames { get; }
 
-		public bool UseUnicodeNames {
-			get { return useUnicodeNames; }
-		}
+        public bool UseKoreanNames { get; }
 
-		public bool UseKoreanNames {
-			get { return useKoreanNames; }
-		}
-
-		public string KeyFile {
-			get { return keyFile; }
-		}
-	}
+        public bool AnalyzeXaml { get; }
+    }
 }

@@ -1,17 +1,18 @@
 #region Copyright (c) 2007 Ryan Williams <drcforbin@gmail.com>
+
 /// <copyright>
 /// Copyright (c) 2007 Ryan Williams <drcforbin@gmail.com>
-/// 
+///
 /// Permission is hereby granted, free of charge, to any person obtaining a copy
 /// of this software and associated documentation files (the "Software"), to deal
 /// in the Software without restriction, including without limitation the rights
 /// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 /// copies of the Software, and to permit persons to whom the Software is
 /// furnished to do so, subject to the following conditions:
-/// 
+///
 /// The above copyright notice and this permission notice shall be included in
 /// all copies or substantial portions of the Software.
-/// 
+///
 /// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 /// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 /// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -20,7 +21,9 @@
 /// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 /// THE SOFTWARE.
 /// </copyright>
+
 #endregion
+
 using Mono.Cecil;
 using System;
 using System.Collections;
@@ -28,314 +31,391 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
-using System.Xml;
 using Obfuscar.Helpers;
+using System.Xml.Linq;
 
 namespace Obfuscar
 {
-	class Project : IEnumerable<AssemblyInfo>
-	{
-		private const string SPECIALVAR_PROJECTFILEDIRECTORY = "ProjectFileDirectory";
-		private readonly List<AssemblyInfo> assemblyList = new List<AssemblyInfo> ();
+    class Project
+    {
+        private const string SPECIALVAR_PROJECTFILEDIRECTORY = "ProjectFileDirectory";
+        public List<AssemblyInfo> AssemblyList { get; } = new List<AssemblyInfo>();
+        public List<AssemblyInfo> CopyAssemblyList { get; } = new List<AssemblyInfo>();
 
-		public List<AssemblyInfo> CopyAssemblyList {
-			get {
-				return copyAssemblyList;
-			}
-		}
+        private readonly Dictionary<string, AssemblyInfo> assemblyMap = new Dictionary<string, AssemblyInfo>();
+        private readonly Variables vars = new Variables();
+        private readonly List<string> assemblySearchPaths = new List<string>();
 
-		private readonly List<AssemblyInfo> copyAssemblyList = new List<AssemblyInfo> ();
-		private readonly Dictionary<string, AssemblyInfo> assemblyMap = new Dictionary<string, AssemblyInfo> ();
-		private readonly Variables vars = new Variables ();
-		InheritMap inheritMap;
-		Settings settings;
-		// FIXME: Figure out why this exists if it is never used.
-		//private RSA keyvalue;
-		// don't create.  call FromXml.
-		private Project ()
-		{
-		}
+        Settings settings;
 
-		public string [] ExtraPaths {
-			get {
-				return vars.GetValue ("ExtraFrameworkFolders", "").Split (new char [] { Path.PathSeparator }, StringSplitOptions.RemoveEmptyEntries);
-			}
-		}
+        // FIXME: Figure out why this exists if it is never used.
+        //private RSA keyvalue;
+        // don't create.  call FromXml.
+        private Project()
+        {
+        }
 
-		public string KeyContainerName = null;
-		public byte[] keyPair;
+        public IEnumerable<string> ExtraPaths
+        {
+            get
+            {
+                return vars.GetValue("ExtraFrameworkFolders", "").Split(new char[] {Path.PathSeparator},
+                    StringSplitOptions.RemoveEmptyEntries);
+            }
+        }
 
-		public byte[] KeyPair {
-			get {
-				if (keyPair != null)
-					return keyPair;
+        public IEnumerable<string> AllAssemblySearchPaths
+        {
+            get
+            {
+                return
+                    ExtraPaths
+                        .Concat(assemblySearchPaths)
+                        .Concat(new[] {Settings.InPath});
+            }
+        }
 
-				var lKeyFileName = vars.GetValue ("KeyFile", null);
-				var lKeyContainerName = vars.GetValue ("KeyContainer", null);
+        public string KeyContainerName = null;
+        private string keyPair;
+        private RSA keyValue;
 
-				if (lKeyFileName == null && lKeyContainerName == null)
-					return null;
-				if (lKeyFileName != null && lKeyContainerName != null)
-					throw new ObfuscarException ("'Key file' and 'Key container' properties cann't be setted together.");
+        public string KeyPair
+        {
+            get
+            {
+                if (keyPair != null)
+                    return keyPair;
 
-				try {
-					keyPair = File.ReadAllBytes (vars.GetValue ("KeyFile", null));
-				} catch (Exception ex) {
-					throw new ObfuscarException (String.Format ("Failure loading key file \"{0}\"", vars.GetValue ("KeyFile", null)), ex);
-				}
+                var lKeyFileName = vars.GetValue("KeyFile", null);
+                var lKeyContainerName = vars.GetValue("KeyContainer", null);
 
-				return keyPair;
-			}
-		}
+                if (lKeyFileName == null && lKeyContainerName == null)
+                    return null;
+                if (lKeyFileName != null && lKeyContainerName != null)
+                    throw new ObfuscarException("'Key file' and 'Key container' properties cann't be setted together.");                               
 
-		public RSA KeyValue {
-			get {
-				//if (keyvalue != null)
-				//	return keyvalue;
+                return keyPair = vars.GetValue("KeyFile", null);
+            }
+        }
 
-				var lKeyFileName = vars.GetValue ("KeyFile", null);
-				var lKeyContainerName = vars.GetValue ("KeyContainer", null);
+        public RSA KeyValue
+        {
+            get
+            {
+                if (keyValue != null)
+                {
+                    return keyValue;
+                }
 
-				if (lKeyFileName == null && lKeyContainerName == null)
-					return null;
-				if (lKeyFileName != null && lKeyContainerName != null)
-					throw new ObfuscarException ("'Key file' and 'Key container' properties cann't be setted together.");
+                if (Type.GetType("System.MonoType") != null)
+                    throw new ObfuscarException("Key containers are not supported for Mono.");
 
-				if (vars.GetValue ("KeyContainer", null) != null) {
-					KeyContainerName = vars.GetValue ("KeyContainer", null);
-					if (Type.GetType ("System.MonoType") != null)
-						throw new ObfuscarException ("Key containers are not supported for Mono.");
-				} 
-   				
-				return null;
-				//return keyvalue;
-			}
-		}
+                var lKeyFileName = vars.GetValue("KeyFile", null);
+                var lKeyContainerName = vars.GetValue("KeyContainer", null);
 
-		AssemblyCache m_cache;
+                if (lKeyFileName == null && lKeyContainerName == null)
+                    return null;
+                if (lKeyFileName != null && lKeyContainerName != null)
+                    throw new ObfuscarException("'Key file' and 'Key container' properties cann't be setted together.");
 
-		internal AssemblyCache Cache {
-			get {
-				if (m_cache == null) {
-					m_cache = new AssemblyCache (this);
-				}
+                KeyContainerName = vars.GetValue("KeyContainer", null);
+                if (KeyContainerName != null)
+                {
+                    CspParameters cp = new CspParameters();
+                    cp.KeyContainerName = KeyContainerName;
 
-				return m_cache;
-			}
-			set { m_cache = value; }
-		}
+                    keyValue = new RSACryptoServiceProvider(cp);
+                    return keyValue;
+                }
 
-		public static Project FromXml (XmlReader reader, string projectFileDirectory)
-		{
-			Project project = new Project ();
+                return null;
+            }
+        }
 
-			project.vars.Add (SPECIALVAR_PROJECTFILEDIRECTORY, string.IsNullOrEmpty (projectFileDirectory) ? "." : projectFileDirectory);
+        AssemblyCache m_cache;
 
-			while (reader.Read ()) {
-				if (reader.NodeType == XmlNodeType.Element) {
-					switch (reader.Name) {
-					case "Var":
-						{
-							string name = Helper.GetAttribute (reader, "name");
-							if (name.Length > 0) {
-								string value = Helper.GetAttribute (reader, "value");
-								if (value.Length > 0)
-									project.vars.Add (name, value);
-								else
-									project.vars.Remove (name);
-							}
-							break;
-						}
-					case "Module":
-						AssemblyInfo info = AssemblyInfo.FromXml (project, reader, project.vars);
-						if (info.Exclude) {
-							project.copyAssemblyList.Add (info);
-							break;
-						}
-						Console.WriteLine ("Processing assembly: " + info.Definition.Name.FullName);
-						project.assemblyList.Add (info);
-						project.assemblyMap [info.Name] = info;
-						break;
-					}
-				}
-			}
+        internal AssemblyCache Cache
+        {
+            get
+            {
+                if (m_cache == null)
+                {
+                    m_cache = new AssemblyCache(this);
+                }
 
-			return project;
-		}
+                return m_cache;
+            }
+            set { m_cache = value; }
+        }
 
-		private class Graph
-		{
-			public List<Node<AssemblyInfo>> Root = new List<Node<AssemblyInfo>> ();
+        public static Project FromXml(XDocument reader, string projectFileDirectory)
+        {
+            Project project = new Project();
 
-			public Graph (List<AssemblyInfo> items)
-			{
-				foreach (var item in items)
-					Root.Add (new Node<AssemblyInfo> { Item = item });
+            project.vars.Add(SPECIALVAR_PROJECTFILEDIRECTORY,
+                string.IsNullOrEmpty(projectFileDirectory) ? "." : projectFileDirectory);
 
-				AddParents (Root);
-			}
+            if (reader.Root.Name != "Obfuscator")
+            {
+                throw new ObfuscarException("XML configuration file should have <Obfuscator> root tag.");
+            }
 
-			private static void AddParents (List<Node<AssemblyInfo>> nodes)
-			{
-				foreach (var node in nodes) {
-					var references = node.Item.References;
-					foreach (var reference in references) {
-						var parent = SearchNode (reference, nodes);
-						node.AppendTo (parent);
-					}
-				}
-			}
+            FromXmlReadNode(reader.Root, project);
 
-			private static Node<AssemblyInfo> SearchNode (AssemblyInfo baseType, List<Node<AssemblyInfo>> nodes)
-			{
-				return nodes.FirstOrDefault (node => node.Item == baseType);
-			}
+            return project;
+        }
 
-			internal IEnumerable<AssemblyInfo> GetOrderedList ()
-			{
-				var result = new List<AssemblyInfo> ();
-				CleanPool (Root, result);
-				return result;
-			}
+        private static void FromXmlReadNode(XElement reader, Project project)
+        {
+            var settings = reader.Elements("Var");
+            foreach (var setting in settings)
+            {
+                var name = setting.Attribute("name")?.Value;
+                if (!string.IsNullOrEmpty(name))
+                {
+                    var value = setting.Attribute("value")?.Value;
+                    if (!string.IsNullOrEmpty(value))
+                        project.vars.Add(name, value);
+                    else
+                        project.vars.Remove(name);
+                }
+            }
 
-			private void CleanPool (List<Node<AssemblyInfo>> pool, List<AssemblyInfo> result)
-			{
-				while (pool.Count > 0) {
-					var toRemoved = new List<Node<AssemblyInfo>> ();
-					foreach (var node in pool) {
-						if (node.Parents.Count == 0) {
-							toRemoved.Add (node);
-							if (result.Contains (node.Item))
-								continue;
+            var includes = reader.Elements("Include");
+            foreach (var include in includes)
+            {
+                ReadIncludeTag(include, project, FromXmlReadNode);
+            }
 
-							result.Add (node.Item);
-						}
-					}
+            var searchPaths = reader.Elements("AssemblySearchPath");
+            foreach (var searchPath in searchPaths)
+            {
+                string path =
+                    Environment.ExpandEnvironmentVariables(Helper.GetAttribute(searchPath, "path", project.vars));
+                project.assemblySearchPaths.Add(path);
+            }
 
-					foreach (var remove in toRemoved) {
-						pool.Remove (remove);
-						foreach (var child in remove.Children) {
-							if (result.Contains (child.Item))
-								continue;
+            var modules = reader.Elements("Module");
+            foreach (var module in modules)
+            {
+                AssemblyInfo info = AssemblyInfo.FromXml(project, module, project.vars);
+                if (info.Exclude)
+                {
+                    project.CopyAssemblyList.Add(info);
+                    break;
+                }
 
-							child.Parents.Remove (remove);
-						}
-					}
-				}
-			}
-		}
+                Console.WriteLine("Processing assembly: " + info.Definition.Name.FullName);
+                project.AssemblyList.Add(info);
+                project.assemblyMap[info.Name] = info;
+            }
+        }
 
-		private void ReorderAssemblies ()
-		{
-			var graph = new Graph (assemblyList);
-			assemblyList.Clear ();
-			assemblyList.AddRange (graph.GetOrderedList ());
-		}
+        internal static void ReadIncludeTag(XElement parentReader, Project project,
+            Action<XElement, Project> readAction)
+        {
+            if (parentReader == null)
+                throw new ArgumentNullException("parentReader");
 
-		/// <summary>
-		/// Looks through the settings, trys to make sure everything looks ok.
-		/// </summary>
-		public void CheckSettings ()
-		{
-			if (!Directory.Exists (Settings.InPath))
-				throw new ObfuscarException ("Path specified by InPath variable must exist:" + Settings.InPath);
+            if (readAction == null)
+                throw new ArgumentNullException("readAction");
 
-			if (!Directory.Exists (Settings.OutPath)) {
-				try {
-					Directory.CreateDirectory (Settings.OutPath);
-				} catch (IOException e) {
-					throw new ObfuscarException ("Could not create path specified by OutPath:  " + Settings.OutPath, e);
-				}
-			}
-		}
+            string path =
+                Environment.ExpandEnvironmentVariables(Helper.GetAttribute(parentReader, "path", project.vars));
+            var includeReader = XDocument.Load(path);
+            if (includeReader.Root.Name == "Include")
+            {
+                readAction(includeReader.Root, project);
+            }
+        }
 
-		internal InheritMap InheritMap {
-			get { return inheritMap; }
-		}
+        private class Graph
+        {
+            public List<Node<AssemblyInfo>> Root = new List<Node<AssemblyInfo>>();
 
-		internal Settings Settings {
-			get {
-				if (settings == null)
-					settings = new Settings (vars);
+            public Graph(List<AssemblyInfo> items)
+            {
+                foreach (var item in items)
+                    Root.Add(new Node<AssemblyInfo> {Item = item});
 
-				return settings;
-			}
-		}
+                AddParents(Root);
+            }
 
-		public void LoadAssemblies ()
-		{
-			// build reference tree
-			foreach (AssemblyInfo info in assemblyList) {
-				// add self reference...makes things easier later, when
-				// we need to go through the member references
-				info.ReferencedBy.Add (info);
+            private static void AddParents(List<Node<AssemblyInfo>> nodes)
+            {
+                foreach (var node in nodes)
+                {
+                    var references = node.Item.References;
+                    foreach (var reference in references)
+                    {
+                        var parent = SearchNode(reference, nodes);
+                        node.AppendTo(parent);
+                    }
+                }
+            }
 
-				// try to get each assembly referenced by this one.  if it's in
-				// the map (and therefore in the project), set up the mappings
-				foreach (AssemblyNameReference nameRef in info.Definition.MainModule.AssemblyReferences) {
-					AssemblyInfo reference;
-					if (assemblyMap.TryGetValue (nameRef.Name, out reference)) {
-						info.References.Add (reference);
-						reference.ReferencedBy.Add (info);
-					}
-				}
-			}
+            private static Node<AssemblyInfo> SearchNode(AssemblyInfo baseType, List<Node<AssemblyInfo>> nodes)
+            {
+                return nodes.FirstOrDefault(node => node.Item == baseType);
+            }
 
-			// make each assembly's list of member refs
-			foreach (AssemblyInfo info in assemblyList) {
-				info.Init ();
-			}
+            internal IEnumerable<AssemblyInfo> GetOrderedList()
+            {
+                var result = new List<AssemblyInfo>();
+                CleanPool(Root, result);
+                return result;
+            }
 
-			// build inheritance map
-			inheritMap = new InheritMap (this);
-			ReorderAssemblies ();
-		}
+            private void CleanPool(List<Node<AssemblyInfo>> pool, List<AssemblyInfo> result)
+            {
+                while (pool.Count > 0)
+                {
+                    var toRemoved = new List<Node<AssemblyInfo>>();
+                    foreach (var node in pool)
+                    {
+                        if (node.Parents.Count == 0)
+                        {
+                            toRemoved.Add(node);
+                            if (result.Contains(node.Item))
+                                continue;
 
-		/// <summary>
-		/// Returns whether the project contains a given type.
-		/// </summary>
-		public bool Contains (TypeReference type)
-		{
-			string name = type.GetScopeName ();
+                            result.Add(node.Item);
+                        }
+                    }
 
-			return assemblyMap.ContainsKey (name);
-		}
+                    foreach (var remove in toRemoved)
+                    {
+                        pool.Remove(remove);
+                        foreach (var child in remove.Children)
+                        {
+                            if (result.Contains(child.Item))
+                                continue;
 
-		/// <summary>
-		/// Returns whether the project contains a given type.
-		/// </summary>
-		internal bool Contains (TypeKey type)
-		{
-			return assemblyMap.ContainsKey (type.Scope);
-		}
+                            child.Parents.Remove(remove);
+                        }
+                    }
+                }
+            }
+        }
 
-		public TypeDefinition GetTypeDefinition (TypeReference type)
-		{
-			if (type == null)
-				return null;
+        private void ReorderAssemblies()
+        {
+            var graph = new Graph(AssemblyList);
+            AssemblyList.Clear();
+            AssemblyList.AddRange(graph.GetOrderedList());
+        }
 
-			TypeDefinition typeDef = type as TypeDefinition;
-			if (typeDef == null) {
-				string name = type.GetScopeName ();
+        /// <summary>
+        /// Looks through the settings, trys to make sure everything looks ok.
+        /// </summary>
+        public void CheckSettings()
+        {
+            foreach (string assemblySearchPath in assemblySearchPaths)
+            {
+                if (!Directory.Exists(assemblySearchPath))
+                    throw new ObfuscarException("Path specified by AssemblySearchPath must exist:" +
+                                                assemblySearchPath);
+            }
 
-				AssemblyInfo info;
-				if (assemblyMap.TryGetValue (name, out info)) {
-					string fullName = type.Namespace + "." + type.Name;
-					typeDef = info.Definition.MainModule.GetType (fullName);
-				}
-			}
+            if (!Directory.Exists(Settings.InPath))
+                throw new ObfuscarException("Path specified by InPath variable must exist:" + Settings.InPath);
 
-			return typeDef;
-		}
+            if (!Directory.Exists(Settings.OutPath))
+            {
+                try
+                {
+                    Directory.CreateDirectory(Settings.OutPath);
+                }
+                catch (IOException e)
+                {
+                    throw new ObfuscarException("Could not create path specified by OutPath:  " + Settings.OutPath, e);
+                }
+            }
+        }
 
-		IEnumerator IEnumerable.GetEnumerator ()
-		{
-			return assemblyList.GetEnumerator ();
-		}
+        internal InheritMap InheritMap { get; private set; }
 
-		public IEnumerator<AssemblyInfo> GetEnumerator ()
-		{
-			return assemblyList.GetEnumerator ();
-		}
-	}
+        internal Settings Settings
+        {
+            get
+            {
+                if (settings == null)
+                    settings = new Settings(vars);
+
+                return settings;
+            }
+        }
+
+        public void LoadAssemblies()
+        {
+            // build reference tree
+            foreach (AssemblyInfo info in AssemblyList)
+            {
+                // add self reference...makes things easier later, when
+                // we need to go through the member references
+                info.ReferencedBy.Add(info);
+
+                // try to get each assembly referenced by this one.  if it's in
+                // the map (and therefore in the project), set up the mappings
+                foreach (AssemblyNameReference nameRef in info.Definition.MainModule.AssemblyReferences)
+                {
+                    AssemblyInfo reference;
+                    if (assemblyMap.TryGetValue(nameRef.Name, out reference))
+                    {
+                        info.References.Add(reference);
+                        reference.ReferencedBy.Add(info);
+                    }
+                }
+            }
+
+            // make each assembly's list of member refs
+            foreach (AssemblyInfo info in AssemblyList)
+            {
+                info.Init();
+            }
+
+            // build inheritance map
+            InheritMap = new InheritMap(this);
+            ReorderAssemblies();
+        }
+
+        /// <summary>
+        /// Returns whether the project contains a given type.
+        /// </summary>
+        public bool Contains(TypeReference type)
+        {
+            string name = type.GetScopeName();
+
+            return assemblyMap.ContainsKey(name);
+        }
+
+        /// <summary>
+        /// Returns whether the project contains a given type.
+        /// </summary>
+        internal bool Contains(TypeKey type)
+        {
+            return assemblyMap.ContainsKey(type.Scope);
+        }
+
+        public TypeDefinition GetTypeDefinition(TypeReference type)
+        {
+            if (type == null)
+                return null;
+
+            TypeDefinition typeDef = type as TypeDefinition;
+            if (typeDef == null)
+            {
+                string name = type.GetScopeName();
+
+                AssemblyInfo info;
+                if (assemblyMap.TryGetValue(name, out info))
+                {
+                    string fullName = type.Namespace + "." + type.Name;
+                    typeDef = info.Definition.MainModule.GetType(fullName);
+                }
+            }
+
+            return typeDef;
+        }
+    }
 }

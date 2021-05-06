@@ -1,4 +1,5 @@
 ﻿#region Copyright (c) 2007 Ryan Williams <drcforbin@gmail.com>
+
 /// <copyright>
 /// Copyright (c) 2007 Ryan Williams <drcforbin@gmail.com>
 /// 
@@ -20,6 +21,7 @@
 /// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 /// THE SOFTWARE.
 /// </copyright>
+
 #endregion
 
 using Mono.Cecil;
@@ -38,38 +40,57 @@ namespace ObfuscarTests
                 if (method.FullName == name)
                     return method;
 
-            Assert.True(false, String.Format("Expected to find method: {0}", name));
+            Assert.True(false, string.Format("Expected to find method: {0}", name));
             return null; // never here
         }
 
         [Fact]
         public void CheckGeneric()
         {
-            string xml = String.Format(
-                             @"<?xml version='1.0'?>" +
-                             @"<Obfuscator>" +
-                             @"<Var name='InPath' value='{0}' />" +
-                             @"<Var name='OutPath' value='{1}' />" +
-                             @"<Var name='KeyFile' value='$(InPath)\..\dockpanelsuite.snk' />" +
-                             @"<Var name='HidePrivateApi' value='true' />" +
-                             @"<Var name='KeepPublicApi' value='false' />" +
-                             @"<Module file='$(InPath)\System.Windows.Controls.DataVisualization.Toolkit.dll' />" +
-                             @"</Obfuscator>", TestHelper.InputPath, TestHelper.OutputPath);
+            string xml = string.Format(
+                @"<?xml version='1.0'?>" +
+                @"<Obfuscator>" +
+                @"<Var name='InPath' value='{0}' />" +
+                @"<Var name='OutPath' value='{1}' />" +
+                @"<Var name='KeyFile' value='$(InPath){2}SigningKey.snk' />" +
+                @"<Var name='HidePrivateApi' value='true' />" +
+                @"<Var name='KeepPublicApi' value='false' />" +
+                @"<Var name='AnalyzeXaml' value='true' />" +
+                @"<Module file='$(InPath){2}System.Windows.Controls.DataVisualization.Toolkit.dll' />" +
+                @"</Obfuscator>", TestHelper.InputPath, TestHelper.OutputPath, Path.DirectorySeparatorChar);
 
             TestHelper.CleanInput();
 
             // build it with the keyfile option (embeds the public key, and signs the assembly)
-            File.Copy(Path.Combine(TestHelper.InputPath, @"..\System.Windows.Controls.DataVisualization.Toolkit.dll"), Path.Combine(TestHelper.InputPath, "System.Windows.Controls.DataVisualization.Toolkit.dll"), true);
-            File.Copy(Path.Combine(TestHelper.InputPath, @"..\WPFToolkit.dll"), Path.Combine(TestHelper.InputPath, "WPFToolkit.dll"), true);
+            string destFileName = Path.Combine(TestHelper.InputPath, "System.Windows.Controls.DataVisualization.Toolkit.dll");
+            if (!File.Exists(destFileName))
+            {
+                File.Copy(
+                    Path.Combine(TestHelper.InputPath, @"..", "System.Windows.Controls.DataVisualization.Toolkit.dll"),
+                    destFileName, true);
+            }
+
+            string destFileName1 = Path.Combine(TestHelper.InputPath, "WPFToolkit.dll");
+            if (!File.Exists(destFileName1))
+            {
+                File.Copy(Path.Combine(TestHelper.InputPath, @"..", "WPFToolkit.dll"),
+                    destFileName1, true);
+            }
 
             var map = TestHelper.Obfuscate(xml).Mapping;
 
             AssemblyDefinition inAssmDef = AssemblyDefinition.ReadAssembly(
-                                               Path.Combine(TestHelper.InputPath, "System.Windows.Controls.DataVisualization.Toolkit.dll"));
+                Path.Combine(TestHelper.InputPath, "System.Windows.Controls.DataVisualization.Toolkit.dll"));
 
-            TypeDefinition classAType = inAssmDef.MainModule.GetType("System.Windows.Controls.DataVisualization.Charting.NullableConverter`1");
+            TypeDefinition classAType =
+                inAssmDef.MainModule.GetType("System.Windows.Controls.DataVisualization.Charting.NullableConverter`1");
             var type = map.GetClass(new TypeKey(classAType));
             Assert.True(type.Status == ObfuscationStatus.Renamed, "Type should have been renamed.");
+
+            TypeDefinition classBType = inAssmDef.MainModule.GetType("System.Windows.Controls.DataVisualization.Charting.AreaDataPoint");
+            var type2 = map.GetClass(new TypeKey(classBType));
+            Assert.True(type2.Status == ObfuscationStatus.Skipped, "chart type should have been skipped");
+            Assert.Equal("filtered by BAML", type2.StatusText);
         }
     }
 }

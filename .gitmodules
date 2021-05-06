@@ -1,3 +1,3 @@
-[submodule "ilspy"]
-	path = ilspy
+[submodule "ThirdParty/ILSpy"]
+	path = ThirdParty/ILSpy
 	url = https://github.com/icsharpcode/ILSpy.git

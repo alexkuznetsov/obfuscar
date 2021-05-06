@@ -1,4 +1,5 @@
 #region Copyright (c) 2007 Ryan Williams <drcforbin@gmail.com>
+
 /// <copyright>
 /// Copyright (c) 2007 Ryan Williams <drcforbin@gmail.com>
 /// 
@@ -20,7 +21,9 @@
 /// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 /// THE SOFTWARE.
 /// </copyright>
+
 #endregion
+
 using System;
 using System.IO;
 using System.CodeDom.Compiler;
@@ -29,74 +32,90 @@ using Xunit;
 
 namespace ObfuscarTests
 {
-	public class DependencyTests
-	{
-		public DependencyTests ()
-		{
-			TestHelper.CleanInput ();
+    public class DependencyTests
+    {
+        public DependencyTests()
+        {
+            TestHelper.CleanInput();
 
-			Microsoft.CSharp.CSharpCodeProvider provider = new Microsoft.CSharp.CSharpCodeProvider ();
+            Microsoft.CSharp.CSharpCodeProvider provider = new Microsoft.CSharp.CSharpCodeProvider();
 
-			CompilerParameters cp = new CompilerParameters ();
-			cp.GenerateExecutable = false;
-			cp.GenerateInMemory = false;
-			cp.TreatWarningsAsErrors = true;
+            CompilerParameters cp = new CompilerParameters();
+            cp.GenerateExecutable = false;
+            cp.GenerateInMemory = false;
+            cp.TreatWarningsAsErrors = true;
 
-			string assemblyAPath = Path.Combine (TestHelper.InputPath, "AssemblyA.dll");
-			cp.OutputAssembly = assemblyAPath;
-			CompilerResults cr = provider.CompileAssemblyFromFile (cp, Path.Combine (TestHelper.InputPath, "AssemblyA.cs"));
-			if (cr.Errors.Count > 0)
-				Assert.True (false, "Unable to compile test assembly:  AssemblyA");
+            CompilerResults cr;
+            string assemblyAPath = Path.Combine(TestHelper.InputPath, "AssemblyA.dll");
+            if (!File.Exists(assemblyAPath))
+            {
+                cp.OutputAssembly = assemblyAPath;
+                cr = provider.CompileAssemblyFromFile(cp, Path.Combine(TestHelper.InputPath, "AssemblyA.cs"));
+                if (cr.Errors.Count > 0)
+                    Assert.True(false, "Unable to compile test assembly:  AssemblyA");
+            }
 
-			cp.ReferencedAssemblies.Add (assemblyAPath);
-			cp.OutputAssembly = Path.Combine (TestHelper.InputPath, "AssemblyB.dll");
-			cr = provider.CompileAssemblyFromFile (cp, Path.Combine (TestHelper.InputPath, "AssemblyB.cs"));
-			if (cr.Errors.Count > 0)
-				Assert.True (false, "Unable to compile test assembly:  AssemblyB");
-		}
+            cp.ReferencedAssemblies.Add(assemblyAPath);
+            string fileName = Path.Combine(TestHelper.InputPath, "AssemblyB.dll");
+            if (File.Exists(fileName))
+            {
+                return;
+            }
 
-		[Fact]
-		public void CheckGoodDependency ()
-		{
-			string xml = String.Format (
-							 @"<?xml version='1.0'?>" +
-							 @"<Obfuscator>" +
-							 @"<Var name='InPath' value='{0}' />" +
-							 @"<Module file='$(InPath)\AssemblyB.dll' />" +
-							 @"</Obfuscator>", TestHelper.InputPath);
+            cp.OutputAssembly = fileName;
+            cr = provider.CompileAssemblyFromFile(cp, Path.Combine(TestHelper.InputPath, "AssemblyB.cs"));
+            if (cr.Errors.Count > 0)
+                Assert.True(false, "Unable to compile test assembly:  AssemblyB");
+        }
 
-			Obfuscator obfuscator = Obfuscator.CreateFromXml (xml);
-		}
+        [Fact]
+        public void CheckGoodDependency()
+        {
+            string xml = string.Format(
+                @"<?xml version='1.0'?>" +
+                @"<Obfuscator>" +
+                @"<Var name='InPath' value='{0}' />" +
+                @"<Module file='$(InPath){1}AssemblyB.dll' />" +
+                @"</Obfuscator>", TestHelper.InputPath, Path.DirectorySeparatorChar);
 
-		[Fact]
-		public void CheckDeletedDependency ()
-		{
-			string xml = String.Format (
-							 @"<?xml version='1.0'?>" +
-							 @"<Obfuscator>" +
-							 @"<Var name='InPath' value='{0}' />" +
-							 @"<Module file='$(InPath)\AssemblyB.dll' />" +
-							 @"</Obfuscator>", TestHelper.InputPath);
+            Obfuscator obfuscator = Obfuscator.CreateFromXml(xml);
+        }
 
-			// explicitly delete AssemblyA
-			File.Delete (Path.Combine (TestHelper.InputPath, "AssemblyA.dll"));
-			var exception = Assert.Throws<ObfuscarException>(() => { Obfuscator.CreateFromXml(xml); });
-			Assert.Equal("Unable to resolve dependency:  AssemblyA", exception.Message);
-		}
+        [Fact]
+        public void CheckDeletedDependency()
+        {
+            string xml = string.Format(
+                @"<?xml version='1.0'?>" +
+                @"<Obfuscator>" +
+                @"<Var name='InPath' value='{0}' />" +
+                @"<Module file='$(InPath){1}AssemblyB.dll' />" +
+                @"</Obfuscator>", TestHelper.InputPath, Path.DirectorySeparatorChar);
 
-		[Fact]
-		public void CheckMissingDependency ()
-		{
-			string xml = String.Format (
-							 @"<?xml version='1.0'?>" +
-							 @"<Obfuscator>" +
-							 @"<Module file='{0}\AssemblyD.dll' />" +
-							 @"</Obfuscator>", TestHelper.InputPath);
+            // explicitly delete AssemblyA
+            File.Delete(Path.Combine(TestHelper.InputPath, "AssemblyA.dll"));
+            var exception = Assert.Throws<ObfuscarException>(() => { Obfuscator.CreateFromXml(xml); });
+            Assert.Equal("Unable to resolve dependency:  AssemblyA", exception.Message);
+        }
 
-			// InPath defaults to '.', which doesn't contain AssemblyA
-			File.Copy (Path.Combine (TestHelper.InputPath, @"..\AssemblyD.dll"), Path.Combine (TestHelper.InputPath, "AssemblyD.dll"), true);
-			var exception = Assert.Throws<ObfuscarException> (() => { Obfuscator.CreateFromXml (xml); });
-			Assert.Equal ("Unable to resolve dependency:  AssemblyC", exception.Message);
-		}
-	}
+        [Fact]
+        public void CheckMissingDependency()
+        {
+            string xml = string.Format(
+                @"<?xml version='1.0'?>" +
+                @"<Obfuscator>" +
+                @"<Module file='{0}{1}AssemblyD.dll' />" +
+                @"</Obfuscator>", TestHelper.InputPath, Path.DirectorySeparatorChar);
+
+            // InPath defaults to '.', which doesn't contain AssemblyA
+            string destFileName = Path.Combine(TestHelper.InputPath, "AssemblyD.dll");
+            if (!File.Exists(destFileName))
+            {
+                File.Copy(Path.Combine(TestHelper.InputPath, @"..", "AssemblyD.dll"),
+                    destFileName, true);
+            }
+
+            var exception = Assert.Throws<ObfuscarException>(() => { Obfuscator.CreateFromXml(xml); });
+            Assert.Equal("Unable to resolve dependency:  AssemblyC", exception.Message);
+        }
+    }
 }

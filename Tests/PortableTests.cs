@@ -1,4 +1,5 @@
 ﻿#region Copyright (c) 2007 Ryan Williams <drcforbin@gmail.com>
+
 /// <copyright>
 /// Copyright (c) 2007 Ryan Williams <drcforbin@gmail.com>
 /// 
@@ -20,6 +21,7 @@
 /// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 /// THE SOFTWARE.
 /// </copyright>
+
 #endregion
 
 using System.IO;
@@ -29,37 +31,43 @@ using Xunit;
 
 namespace ObfuscarTests
 {
-	public class PortableTests
-	{
-		[Fact]
-		public void CheckPortable()
-		{
-			string xml = string.Format(
-				@"<?xml version='1.0'?>" +
-				@"<Obfuscator>" +
-				@"<Var name='InPath' value='{0}' />" +
-				@"<Var name='OutPath' value='{1}' />" +
-				@"<Var name='HideStrings' value='false' />" +
-				@"<Var name='KeyFile' value='$(InPath)\..\dockpanelsuite.snk' />" +
-				@"<Module file='$(InPath)\SharpSnmpLib.Portable.dll' />" +
-				@"</Obfuscator>", TestHelper.InputPath, TestHelper.OutputPath);
+    public class PortableTests
+    {
+        [Fact]
+        public void CheckPortable()
+        {
+            string outputPath = TestHelper.OutputPath;
+            string xml = string.Format(
+                @"<?xml version='1.0'?>" +
+                @"<Obfuscator>" +
+                @"<Var name='InPath' value='{0}' />" +
+                @"<Var name='OutPath' value='{1}' />" +
+                @"<Var name='HideStrings' value='false' />" +
+                @"<Var name='KeyFile' value='$(InPath){2}SigningKey.snk' />" +
+                @"<Module file='$(InPath){2}SharpSnmpLib.Portable.dll' />" +
+                @"</Obfuscator>", TestHelper.InputPath, outputPath, Path.DirectorySeparatorChar);
 
-			TestHelper.CleanInput();
+            TestHelper.CleanInput();
 
-			// build it with the keyfile option (embeds the public key, and signs the assembly)
-			File.Copy(Path.Combine(TestHelper.InputPath, @"..\SharpSnmpLib.Portable.dll"), Path.Combine(TestHelper.InputPath, "SharpSnmpLib.Portable.dll"), true);
+            // build it with the keyfile option (embeds the public key, and signs the assembly)
+            string destFileName = Path.Combine(TestHelper.InputPath, "SharpSnmpLib.Portable.dll");
+            if (!File.Exists(destFileName))
+            {
+                File.Copy(Path.Combine(TestHelper.InputPath, @"..", "SharpSnmpLib.Portable.dll"),
+                  destFileName, true);
+            }
 
-			var map = TestHelper.Obfuscate(xml).Mapping;
+            var map = TestHelper.Obfuscate(xml).Mapping;
 
-			AssemblyDefinition inAssmDef = AssemblyDefinition.ReadAssembly(
-				Path.Combine(TestHelper.InputPath, "SharpSnmpLib.Portable.dll"));
+            AssemblyDefinition inAssmDef = AssemblyDefinition.ReadAssembly(
+                Path.Combine(TestHelper.InputPath, "SharpSnmpLib.Portable.dll"));
 
-			AssemblyDefinition outAssmDef = AssemblyDefinition.ReadAssembly(
-				Path.Combine(TestHelper.OutputPath, "SharpSnmpLib.Portable.dll"));
+            AssemblyDefinition outAssmDef = AssemblyDefinition.ReadAssembly(
+                Path.Combine(outputPath, "SharpSnmpLib.Portable.dll"));
 
-			var corlibs = outAssmDef.MainModule.AssemblyReferences.Where(reference => reference.Name == "mscorlib");
-			Assert.Equal(1, corlibs.Count());
-			Assert.Equal("2.0.5.0", corlibs.First().Version.ToString());
-		}
-	}
+            var corlibs = outAssmDef.MainModule.AssemblyReferences.Where(reference => reference.Name == "mscorlib");
+            Assert.Single(corlibs);
+            Assert.Equal("2.0.5.0", corlibs.First().Version.ToString());
+        }
+    }
 }
